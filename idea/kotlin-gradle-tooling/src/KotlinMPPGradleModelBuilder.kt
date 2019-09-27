@@ -55,7 +55,7 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         return KotlinMPPGradleModelImpl(
             sourceSetMap,
             targets,
-            ExtraFeaturesImpl(coroutinesState, isHMPPEnabled(project)),
+            ExtraFeaturesImpl(coroutinesState, isHMPPEnabled(project), isNativeDependencyPropagationEnabled(project)),
             kotlinNativeHome,
             dependencyMapper.toDependencyMap()
         )
@@ -64,6 +64,10 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
     private fun isHMPPEnabled(project: Project): Boolean {
         //TODO(auskov): replace with Project.isKotlinGranularMetadataEnabled after merging with gradle pranch
         return (project.findProperty("kotlin.mpp.enableGranularSourceSetsMetadata") as? String)?.toBoolean() ?: false
+    }
+
+    private fun isNativeDependencyPropagationEnabled(project: Project): Boolean {
+        return (project.findProperty("kotlin.native.enableDependencyPropagation") as? String)?.toBoolean() ?: true
     }
 
     private fun reportUnresolvedDependencies(targets: Collection<KotlinTarget>) {

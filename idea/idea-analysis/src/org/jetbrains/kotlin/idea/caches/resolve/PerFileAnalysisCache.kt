@@ -87,22 +87,21 @@ internal class PerFileAnalysisCache(val file: KtFile, componentProvider: Compone
     }
 
     fun getAnalysisResults(element: KtElement): AnalysisResult {
-        val ktFile = element.containingKtFile
-        assert(ktFile == file) { "Wrong file. Expected $file, but was $ktFile" }
+        assert(element.containingKtFile == file) { "Wrong file. Expected $file, but was ${element.containingKtFile}" }
 
         val analyzableParent = KotlinResolveDataProvider.findAnalyzableParent(element)
 
-        val inBlockModifications = ktFile.inBlockModifications
-        return synchronized(this) {
+        val inBlockModifications = file.inBlockModifications
 
-            val analysisResult = cache[ktFile]
+        return synchronized(this) {
+            val analysisResult = cache[file]
             // step 1: perform incremental analysis IF there is a cached result for ktFile and there are inBlockModifications
             if (analysisResult != null && inBlockModifications.isNotEmpty()) {
                 var result = analysisResult!!
                 val iterator = inBlockModifications.iterator()
                 for (inBlockModification in iterator) {
                     val inBlockResult = analyze(inBlockModification)
-                    result = mergeResults(inBlockModification, inBlockResult, ktFile, result)
+                    result = mergeResults(inBlockModification, inBlockResult, file, result)
 
                     iterator.remove()
                 }
@@ -116,9 +115,9 @@ internal class PerFileAnalysisCache(val file: KtFile, componentProvider: Compone
                 return@synchronized it
             }
 
-            // step 3: return ktFile analyze if it is available (as it accumulate all results)
-            if (cache[ktFile] != null) {
-                return@synchronized cache[ktFile]!!
+            // step 3: return ktFile analyze if it is available (as it accumulates all results)
+            cache[file]?.let {
+                return@synchronized it
             }
 
             // step 4: perform analyze of analyzableParent as nothing has been cached yet
@@ -250,16 +249,13 @@ internal class PerFileAnalysisCache(val file: KtFile, componentProvider: Compone
     }
 }
 
-private class MergedDiagnostics(diagnostics: Collection<Diagnostic>, override val modificationTracker: ModificationTracker) : Diagnostics {
-    //copy to prevent external change
-    private val diagnostics = ArrayList(diagnostics)
-
+private class MergedDiagnostics(val diagnostics: Collection<Diagnostic>, override val modificationTracker: ModificationTracker) : Diagnostics {
     @Suppress("UNCHECKED_CAST")
-    private val elementsCache = DiagnosticsElementsCache(this, { true })
+    private val elementsCache = DiagnosticsElementsCache(this) { true }
 
     override fun all() = diagnostics
 
-    override fun forElement(psiElement: PsiElement) = elementsCache.getDiagnostics(psiElement)
+    override fun forElement(psiElement: PsiElement): MutableCollection<Diagnostic> = elementsCache.getDiagnostics(psiElement)
 
     override fun noSuppression() = this
 }
